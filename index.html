@@ -1,12 +1,13 @@
 <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
 <html> <head>
 <title>Laplacian webtoy</title>
-</head>
+<link rel="stylesheet" href="laplace.css">
 
 <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
 <script src="http://numericjs.com/lib/numeric-1.2.6.min.js"></script>
 <script defer='true' src="laplace.js"></script>
 
+</head>
 <body>
 <h1>Graph Laplacian webtoy</h1>
 
@@ -20,12 +21,14 @@
 <p>
 Click in the open space to <b>add a node</b>, drag from one node to
 another to <b>add an edge</b>.<br /> 
-Ctrl-drag a node to <b>move</b> the graph layout. 
+Shift-drag a node to <b>move</b> the graph layout. 
 Click a node or an edge to <b>select</b> it. When it is selected,
-<b>Delete</b> removes it.
+<b>Delete</b> removes it. <br />
+Press L to recompute the Graph Laplacian eigenvectors. <br />
+Press P and N to move between eigenvectors of the Graph Laplacian.
 </p>
 
 <hr>
 <address></address>
-<!-- hhmts start -->Last modified: Sun Jan 18 13:39:50 CET 2015 <!-- hhmts end -->
+<!-- hhmts start -->Last modified: Sun Jan 18 13:58:38 CET 2015 <!-- hhmts end -->
 </body> </html>

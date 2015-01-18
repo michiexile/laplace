@@ -1,15 +1,37 @@
-var width  = 800,
-    height = 500,
-    colors = d3.scale.category10();
+var width   = 800,
+    height  = 500,
+    colors  = d3.scale.linear()
+    .domain([-1,0,1])
+    .range(["red", "white", "blue"]);
 
 var svg = d3.select('#canvas')
     .append('svg')
     .attr('width', width)
     .attr('height', height)
 
-var nodes = [], 
-    lastNodeId = -1,
-    links = [];
+var nodes = [{'id': 0, 'd': -1}, {'id': 1, 'd': -1}, {'id': 2, 'd': -1}, 
+	     {'id': 3, 'd': -1}, {'id': 4, 'd': -1}, {'id': 5, 'd': -1}, 
+	     {'id': 6, 'd': -1}], 
+    lastNodeId = 6,
+    links = [{'source': 0, 'target': 1, 'd': 0},
+	     {'source': 0, 'target': 2, 'd': 0},
+	     {'source': 0, 'target': 3, 'd': 0},
+	     {'source': 0, 'target': 4, 'd': 0},
+	     {'source': 1, 'target': 5, 'd': 0},
+	     {'source': 2, 'target': 5, 'd': 0},
+	     {'source': 3, 'target': 6, 'd': 0},
+	     {'source': 4, 'target': 6, 'd': 0}];
+
+// D3 zoom
+var zoom = d3.behavior.zoom()
+    .scaleExtent([0.1, 3])
+    .on("zoom", zoomHandler);
+
+function zoomHandler() {
+    svg.attr("transform", 
+	     "translate(" + d3.event.translate + ") scale(" + d3.event.scale + ")");
+}
+zoom(svg);
 
 // init D3 force layout
 var force = d3.layout.force()
@@ -35,6 +57,58 @@ function resetMouseVars() {
     mousedown_node = null;
     mouseup_node = null;
     mousedown_link = null;
+}
+
+var EVs   = [],
+    evidx = 0;
+
+function setEV() {
+    if(EVs.length < 1 || nodes.length != EVs[evidx].length) return;
+
+    for(i=0; i<nodes.length; i++) {
+	nodes[i].d = EVs[evidx][nodes[i].id];
+    }
+};
+
+function graphlaplacian() {
+    // dense array
+    var D = [];
+    for(i = 0; i<nodes.length; i++) {
+	D[i] = [];
+	for(j = 0; j<nodes.length; j++) { 
+	    D[i][j] = 0; 
+	}
+    }
+
+    for(link in links) {
+	e = links[link];
+
+	// D diagonal has degrees
+	D[e.source.id][e.source.id] += 1;
+	D[e.target.id][e.target.id] += 1;
+
+	// D off-diagonal has negative adjacency
+	D[e.source.id][e.target.id] = -1;
+	D[e.target.id][e.source.id] = -1;
+    }
+
+    EVs = numeric.eig(D).E.x;
+    setEV();
+    restart();
+}
+
+function nextEV() {
+    evidx += 1;
+    evidx = (evidx % nodes.length);
+    setEV();
+    restart();
+}
+
+function prevEV() {
+    evidx -= 1;
+    evidx = ((evidx+nodes.length) % nodes.length);
+    setEV();
+    restart();
 }
 
 // update force layout (called automatically each iteration)
@@ -90,8 +164,7 @@ function restart() {
 
     // update existing nodes (reflexive & selected visual states)
     circle.selectAll('circle')
-	.style('fill', function(d) { return (d === selected_node) ? d3.rgb(colors(d.id)).brighter().toString() : colors(d.id); })
-	.classed('reflexive', function(d) { return d.reflexive; });
+	.style('fill', function(d) { return (d === selected_node) ? d3.rgb(colors(d.d)).brighter().toString() : colors(d.d); });
 
     // add new nodes
     var g = circle.enter().append('svg:g');
@@ -101,10 +174,9 @@ function restart() {
 	.attr('r', 12)
 	.style('fill', function(d) { 
 	    return (d === selected_node) ? 
-		d3.rgb(colors(d.id)).brighter().toString() : 
-		colors(d.id); })
-	.style('stroke', function(d) { 
-	    return d3.rgb(colors(d.id)).darker().toString(); })
+		d3.rgb(colors(d.d)).brighter().toString() : 
+		colors(d.d); })
+	.style('stroke', 'black')
 	.on('mouseover', function(d) {
 	    if(!mousedown_node || d === mousedown_node) return;
 	    // enlarge target node
@@ -116,7 +188,7 @@ function restart() {
 	    d3.select(this).attr('transform', '');
 	})
 	.on('mousedown', function(d) {
-	    if(d3.event.ctrlKey) return;
+	    if(d3.event.shiftKey) return;
 	    
 	    // select node
 	    mousedown_node = d;
@@ -162,90 +234,111 @@ function restart() {
 	    selected_node = null;
 	    restart();
 	});
-	    
+    
     circle.exit().remove();
 
     force.start();
 }
 
 function mousedown() {
-  // prevent I-bar on drag
-  //d3.event.preventDefault();
-  
-  // because :active only works in WebKit?
-  svg.classed('active', true);
+    // prevent I-bar on drag
+    //d3.event.preventDefault();
+    
+    // because :active only works in WebKit?
+    svg.classed('active', true);
 
-  if(d3.event.ctrlKey || mousedown_node || mousedown_link) return;
+    if(d3.event.shiftKey || mousedown_node || mousedown_link) return;
 
-  // insert new node at point
-  var point = d3.mouse(this),
-      node = {id: ++lastNodeId};
-  node.x = point[0];
-  node.y = point[1];
-  nodes.push(node);
+    // insert new node at point
+    var point = d3.mouse(this),
+	node = {id: ++lastNodeId};
+    node.x = point[0];
+    node.y = point[1];
+    nodes.push(node);
 
-  restart();
+    restart();
 }
 
 function mouseup() {
-  // because :active only works in WebKit?
-  svg.classed('active', false);
+    // because :active only works in WebKit?
+    svg.classed('active', false);
 
-  // clear mouse event vars
-  resetMouseVars();
+    // clear mouse event vars
+    resetMouseVars();
 }
 
 function spliceLinksForNode(node) {
-  var toSplice = links.filter(function(l) {
-    return (l.source === node || l.target === node);
-  });
-  toSplice.map(function(l) {
-    links.splice(links.indexOf(l), 1);
-  });
+    var toSplice = links.filter(function(l) {
+	return (l.source === node || l.target === node);
+    });
+    toSplice.map(function(l) {
+	links.splice(links.indexOf(l), 1);
+    });
 }
 
 // only respond once per keydown
 var lastKeyDown = -1;
 
 function keydown() {
-  d3.event.preventDefault();
+    d3.event.preventDefault();
+    
+    if(lastKeyDown !== -1) { return; }
+    lastKeyDown = d3.event.keyCode;
 
-  if(lastKeyDown !== -1) return;
-  lastKeyDown = d3.event.keyCode;
+    console.log(lastKeyDown);
 
-  if(!selected_node && !selected_link) return;
-  switch(d3.event.keyCode) {
+    // ctrl
+    if(d3.event.keyCode === 16) {
+	circle.call(force.drag);
+	svg.classed('ctrl', true);
+    }
+
+
+    if(!selected_node && !selected_link) return;
+    switch(d3.event.keyCode) {
     case 8: // backspace
     case 46: // delete
-      if(selected_node) {
-        nodes.splice(nodes.indexOf(selected_node), 1);
-        spliceLinksForNode(selected_node);
-      } else if(selected_link) {
-        links.splice(links.indexOf(selected_link), 1);
-      }
-      selected_link = null;
-      selected_node = null;
-      restart();
-      break;
-  }
+	if(selected_node) {
+            nodes.splice(nodes.indexOf(selected_node), 1);
+            spliceLinksForNode(selected_node);
+	} else if(selected_link) {
+            links.splice(links.indexOf(selected_link), 1);
+	}
+	selected_link = null;
+	selected_node = null;
+	restart();
+	break;
+    case 76: // L
+	graphlaplacian();
+	restart();
+	break;
+    case 80: // P
+	prevEV();
+	restart();
+	break;
+    case 79: // N
+	nextEV();
+	restart();
+	break;
+    }
 }
 
 function keyup() {
-  lastKeyDown = -1;
+    lastKeyDown = -1;
 
-  // ctrl
-  if(d3.event.keyCode === 17) {
-    circle
-      .on('mousedown.drag', null)
-      .on('touchstart.drag', null);
-    svg.classed('ctrl', false);
-  }
+    // ctrl
+    if(d3.event.keyCode === 16) {
+	circle
+	    .on('mousedown.drag', null)
+	    .on('touchstart.drag', null);
+	svg.classed('ctrl', false);
+    }
 }
 
 // app starts here
 svg.on('mousedown', mousedown)
-  .on('mouseup', mouseup);
+    .on('mouseup', mouseup);
 d3.select(window)
-  .on('keydown', keydown)
-  .on('keyup', keyup);
+    .on('keydown', keydown)
+    .on('keyup', keyup);
 restart();
